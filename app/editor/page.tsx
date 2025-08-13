@@ -2,7 +2,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import AppTopBar from '../../components/AppTopBar'
-import AppTabBar from '../../components/AppTabBar'
 import { templates } from '../../lib/data'
 
 type Align = 'left'|'center'|'right'
@@ -17,26 +16,33 @@ const CANVAS = 1080
 const uid = () => Math.random().toString(36).slice(2, 10)
 const clamp = (n:number,a:number,b:number)=>Math.max(a,Math.min(b,n))
 
-// 간단 스티커(원하는 PNG를 public/stickers 에 넣어서 경로만 추가)
+// public/stickers/* 에 파일 넣어두면 경로만 추가하면 됩니다.
 const STICKERS = [
-  '/stickers/y2k-stars.jpeg',
-  '/stickers/blue-pin.jpeg',
-  '/stickers/exclamation.jpeg',
-  '/stickers/question-mark.jpeg',
-  '/stickers/red-pin.jpeg',
-  '/stickers/thunder.jpeg'
+  '/stickers/y2k-stars.png',
+  '/stickers/blue-pin.png',
+  '/stickers/exclamation.png',
+  '/stickers/question-mark.png',
+  '/stickers/red-pin.png',
+  '/stickers/thunder.png',
+  '/stickers/tongs.png',
+  '/stickers/green-tamagotchi.png',
+  '/stickers/pink-tamagotchi.png'
 ].filter(Boolean)
 
 export default function Editor() {
   const searchParams = useSearchParams()
-  const spKey = searchParams.toString() //의존성을 문자열로 고정
-  const [bg, setBg] = useState('/templates/retro.svg') // 기본값 (쿼리로 덮임)
-  const [els, setEls] = useState<El[]>([])              // 텍스트/스티커 공통 배열
+  const spKey = searchParams.toString()
+
+  const [bg, setBg] = useState('/templates/retro.svg') // 기본 배경(쿼리로 덮임)
+  const [els, setEls] = useState<El[]>([])
   const [sel, setSel] = useState<string|null>(null)
   const selected = useMemo(()=>els.find(e=>e.id===sel) ?? null,[els,sel])
   const [mime, setMime] = useState<'image/png'|'image/jpeg'>('image/png')
 
-  // 프리뷰 박스 크기
+  // 하단 패널 탭: 'text' | 'sticker'
+  const [panel, setPanel] = useState<'text'|'sticker'>('text')
+
+  // 프리뷰 박스 스케일
   const wrapRef = useRef<HTMLDivElement>(null)
   const [view, setView] = useState(0)
   useEffect(()=>{
@@ -45,10 +51,10 @@ export default function Editor() {
   },[])
   const px = (v:number)=> Math.max(8, Math.round(v * (view/1080 || 0.5)))
 
-  // 진입 모드 반영 (템플릿/업로드)
+  // 진입 모드(템플릿/업로드) 반영
   useEffect(()=>{
     const mode = searchParams.get('mode')
-    const raw = searchParams.get('tpl')
+    const raw  = searchParams.get('tpl')
     const tpl  = raw ? decodeURIComponent(raw) : null
 
     if (mode === 'upload') {
@@ -58,7 +64,6 @@ export default function Editor() {
       const hit = templates.find(t=>t.id===tpl)
       if (hit && hit.src !== bg) setBg(hit.src)
     }
-  //문자열 키를 의존성으로 사용
   }, [spKey, bg, searchParams])
 
   // 드래그
@@ -78,12 +83,10 @@ export default function Editor() {
     const rect = wrapRef.current!.getBoundingClientRect()
     const cx = (e.clientX-rect.left)/rect.width
     const cy = (e.clientY-rect.top)/rect.height
-    // 요소가 화면에서 벗어나지 않도록 0~1로 클램프
-    setEls(p=>p.filter(Boolean).map(el=> el.id===cur.id
-      ? { ...el, x: clamp(cx - cur.offX, 0.02, 0.98),
-          y: clamp(cy - cur.offY, 0.02, 0.98) }
-  : el))
-  } 
+    setEls(p=>p.map(el=> el.id===cur.id
+      ? { ...el, x: clamp(cx - cur.offX, 0.02, 0.98), y: clamp(cy - cur.offY, 0.02, 0.98) }
+      : el))
+  }
   const endDrag = (e:React.PointerEvent)=>{ dragRef.current=null; try{(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)}catch{} }
 
   // 내보내기
@@ -95,13 +98,13 @@ export default function Editor() {
     const dw=img.width*s, dh=img.height*s
     ctx.drawImage(img,(CANVAS-dw)/2,(CANVAS-dh)/2,dw,dh)
 
-    // 렌더
     for (const el of els) {
       ctx.save()
       ctx.globalAlpha = el.opacity/100
       if (el.kind==='text') {
         ctx.textAlign=el.align; ctx.textBaseline='middle'
         ctx.font=`bold ${el.fontSize}px 'Anton', Impact, system-ui, sans-serif`
+        ctx.lineJoin = 'round'; ctx.miterLimit = 2
         drawParagraph(ctx, el.text, el.align, el.color, el.strokeColor, el.strokeWidth,
           el.x*CANVAS, el.y*CANVAS, CANVAS-120, el.fontSize)
       } else {
@@ -125,11 +128,11 @@ export default function Editor() {
   const addText = ()=>{
     const t:TextEl = { id:uid(), kind:'text', text:'텍스트', x:.5, y:.2, fontSize:96, color:'#fff',
       strokeColor:'#000', strokeWidth:6, align:'center', opacity:100, scale:1, rotation:0 }
-    setEls(p=>[...p, t]); setSel(t.id)
+    setEls(p=>[...p, t]); setSel(t.id); setPanel('text')
   }
   const addSticker = (src:string)=>{
     const s:StickerEl = { id:uid(), kind:'sticker', src, x:.5, y:.5, scale:1, rotation:0, opacity:100 }
-    setEls(p=>[...p, s]); setSel(s.id)
+    setEls(p=>[...p, s]); setSel(s.id); setPanel('sticker')
   }
   const removeSel = ()=>{ if(!sel) return; setEls(p=>p.filter(e=>e.id!==sel)); setSel(null) }
   const updateSel = (patch: Partial<TextEl & StickerEl>)=>{
@@ -139,7 +142,6 @@ export default function Editor() {
 
   return (
     <>
-      {/* Share 제거, 중앙 타이틀 */}
       <AppTopBar title="Editor" onSave={onSave} />
 
       <main className="app-safe mx-auto max-w-xl px-4 space-y-4">
@@ -151,24 +153,23 @@ export default function Editor() {
           onClick={()=>setSel(null)}
         >
           <img src={bg} alt="bg" className="absolute inset-0 w-full h-full object-cover" />
-          {els.filte(Boolean).map(el=>{
+          {els.map(el=>{
             if (el.kind==='text') {
               return (
                 <div
                   key={el.id}
-                  className={`absolute -translate-x-1/2 -translate-y-1/2 select-none
-                    ${sel===el.id ? 'ring-2 ring-yellow-300 ring-offset-2 ring-offset-black rounded' : ''}`}
+                  className={`absolute -translate-x-1/2 -translate-y-1/2 select-none ${sel===el.id ? 'ring-2 ring-yellow-300 ring-offset-2 ring-offset-black rounded' : ''}`}
                   style={{
-                    left:`${el.x*100}%`, top:`${el.y*100}%`, lineHeight:1.1,
-                    fontSize:`${px(el.fontSize)}px`, fontWeight:700, opacity: el.opacity/100,
-                    color: el.color, textAlign: el.align as any,
-                    WebkitTextStrokeWidth: el.strokeWidth ? `${Math.max(1, px(el.strokeWidth))}px` : undefined,
+                    left:`${el.x*100}%`, top:`${el.y*100}%`,
+                    lineHeight:1.1, fontWeight:700, opacity: el.opacity/100,
+                    fontSize:`${px(el.fontSize)}px`, color: el.color, textAlign: el.align as any,
+                    WebkitTextStrokeWidth: el.strokeWidth ? `${Math.max(1, el.strokeWidth)}px` : undefined,
                     WebkitTextStrokeColor: el.strokeWidth ? el.strokeColor : undefined,
-                    // 드롭섀도우 제거(진짜 아웃라인만)
-                    textShadow: 'none', userSelect:'none', WebkitUserSelect:'none'
+                    paintOrder:'stroke fill',
+                    textShadow:'none', userSelect:'none', WebkitUserSelect:'none'
                   }}
                   onPointerDown={(e)=>startDrag(e, el.id)}
-                  onClick={(e)=>{ e.stopPropagation(); setSel(el.id) }}
+                  onClick={(e)=>{ e.stopPropagation(); setSel(el.id); setPanel('text') }}
                 >
                   {el.text}
                   {sel===el.id && (
@@ -188,14 +189,14 @@ export default function Editor() {
             return (
               <div
                 key={el.id}
-                className={`absolute -translate-x-1/2 -translate-y-1/2 select-none
-                  ${sel===el.id ? 'ring-2 ring-yellow-300 ring-offset-2 ring-offset-black rounded-xl' : ''}`}
+                className={`absolute -translate-x-1/2 -translate-y-1/2 select-none ${sel===el.id ? 'ring-2 ring-yellow-300 ring-offset-2 ring-offset-black rounded-xl' : ''}`}
                 style={{
-                  left:`${el.x*100}%`, top:`${el.y*100}%`, width:size, height:size, opacity: el.opacity/100,
+                  left:`${el.x*100}%`, top:`${el.y*100}%`,
+                  width:size, height:size, opacity: el.opacity/100,
                   transform:`translate(-50%,-50%) rotate(${el.rotation}deg)`
                 }}
                 onPointerDown={(e)=>startDrag(e, el.id)}
-                onClick={(e)=>{ e.stopPropagation(); setSel(el.id) }}
+                onClick={(e)=>{ e.stopPropagation(); setSel(el.id); setPanel('sticker') }}
               >
                 <img src={(el as StickerEl).src} alt="sticker" className="w-full h-full object-contain pointer-events-none" />
                 {sel===el.id && (
@@ -212,15 +213,51 @@ export default function Editor() {
           })}
         </div>
 
-        {/* 하단 패널: 고정 높이 + 내부 스크롤 → overflow 방지 */}
+        {/* Bottom panel: 세그먼트 탭 + 해당 내용만 표시 */}
         <section className="retro-card space-y-3 max-h-64 overflow-y-auto">
-
-          {/* 요소 추가 */}
+          {/* segment tabs */}
           <div className="grid grid-cols-2 gap-2">
-            <button className="btn" onClick={addText}>텍스트 추가</button>
-            <details className="w-full">
-              <summary className="btn-outline cursor-pointer list-none">스티커 추가</summary>
-              <div className="mt-2 grid grid-cols-5 gap-2">
+            <button className={`seg-btn ${panel==='text' ? 'seg-btn-active' : ''}`} onClick={()=>setPanel('text')}>텍스트</button>
+            <button className={`seg-btn ${panel==='sticker' ? 'seg-btn-active' : ''}`} onClick={()=>setPanel('sticker')}>스티커</button>
+          </div>
+
+          {/* TEXT panel */}
+          {panel==='text' && (
+            <>
+              <div className="grid grid-cols-1"><button className="btn" onClick={addText}>텍스트 추가</button></div>
+
+              {selected?.kind==='text'
+                ? (
+                  <>
+                    <input className="input" value={selected.text}
+                           onChange={e=>updateSel({ text:e.target.value })} placeholder="텍스트 입력" />
+                    <div className="grid grid-cols-3 gap-2">
+                      <Range label="크기" value={selected.fontSize} min={24} max={160}
+                             onChange={v=>updateSel({ fontSize:v })}/>
+                      <Color label="색상" value={selected.color} onChange={v=>updateSel({ color:v })}/>
+                      <Color label="외곽선색" value={selected.strokeColor} onChange={v=>updateSel({ strokeColor:v })}/>
+                      <Range label="외곽선" value={selected.strokeWidth} min={0} max={20} step={0.5}
+                             onChange={v=>updateSel({ strokeWidth:v })}/>
+                      <Range label="불투명도" value={selected.opacity} min={10} max={100}
+                             onChange={v=>updateSel({ opacity:v })}/>
+                      <div className="flex items-center gap-2 text-sm">
+                        <span>정렬</span>
+                        <button className="btn-outline" onClick={()=>updateSel({ align:'left' })}>좌</button>
+                        <button className="btn-outline" onClick={()=>updateSel({ align:'center' })}>중</button>
+                        <button className="btn-outline" onClick={()=>updateSel({ align:'right' })}>우</button>
+                      </div>
+                    </div>
+                  </>
+                )
+                : <p className="text-xs text-white/60">텍스트를 추가하거나 캔버스의 텍스트를 선택하세요.</p>
+              }
+            </>
+          )}
+
+          {/* STICKER panel */}
+          {panel==='sticker' && (
+            <>
+              <div className="grid grid-cols-5 gap-2">
                 {STICKERS.map(s=>(
                   <button key={s} className="rounded-xl border border-white/10 bg-white/5 p-2"
                           onClick={()=>addSticker(s)}>
@@ -228,55 +265,26 @@ export default function Editor() {
                   </button>
                 ))}
               </div>
-            </details>
-          </div>
 
-          {/* 선택 속성 */}
-          {selected && selected.kind==='text' && (
-            <>
-              <input className="input" value={selected.text}
-                     onChange={e=>updateSel({ text:e.target.value })} placeholder="텍스트 입력"/>
-              <div className="grid grid-cols-3 gap-2">
-                <Range label="크기" value={selected.fontSize} min={24} max={160}
-                       onChange={v=>updateSel({ fontSize:v })}/>
-                <Color label="색상" value={selected.color} onChange={v=>updateSel({ color:v })}/>
-                <Color label="외곽선색" value={selected.strokeColor} onChange={v=>updateSel({ strokeColor:v })}/>
-                <Range label="외곽선" value={selected.strokeWidth} min={0} max={20} step = {0.5}
-                       onChange={v=>updateSel({ strokeWidth:v })}/>
-                <Range label="불투명도" value={selected.opacity} min={10} max={100}
-                       onChange={v=>updateSel({ opacity:v })}/>
-                <div className="flex items-center gap-2 text-sm">
-                  <span>정렬</span>
-                  <button className="btn-outline" onClick={()=>updateSel({ align:'left' })}>좌</button>
-                  <button className="btn-outline" onClick={()=>updateSel({ align:'center' })}>중</button>
-                  <button className="btn-outline" onClick={()=>updateSel({ align:'right' })}>우</button>
-                </div>
-              </div>
+              {selected?.kind==='sticker'
+                ? (
+                  <div className="grid grid-cols-3 gap-2">
+                    <Range label="크기" value={selected.scale} min={0.5} max={2} step={0.1}
+                           onChange={v=>updateSel({ scale:v })}/>
+                    <Range label="회전" value={selected.rotation} min={-180} max={180}
+                           onChange={v=>updateSel({ rotation:v })}/>
+                    <Range label="불투명도" value={selected.opacity} min={10} max={100}
+                           onChange={v=>updateSel({ opacity:v })}/>
+                  </div>
+                )
+                : <p className="text-xs text-white/60">스티커를 추가하거나 캔버스의 스티커를 선택하세요.</p>
+              }
             </>
           )}
-          {selected && selected.kind==='sticker' && (
-            <div className="grid grid-cols-3 gap-2">
-              <Range label="크기" value={selected.scale} min={0.5} max={2} step={0.1}
-                     onChange={v=>updateSel({ scale:v })}/>
-              <Range label="회전" value={selected.rotation} min={-180} max={180}
-                     onChange={v=>updateSel({ rotation:v })}/>
-              <Range label="불투명도" value={selected.opacity} min={10} max={100}
-                     onChange={v=>updateSel({ opacity:v })}/>
-            </div>
-          )}
 
-          {/* 내보내기 */}
-          <div className="flex items-center gap-2">
-            <select className="input" value={mime} onChange={e=>setMime(e.target.value as any)}>
-              <option value="image/png">PNG</option>
-              <option value="image/jpeg">JPEG</option>
-            </select>
-            <button className="btn ml-auto" onClick={onSave}>Export</button>
-          </div>
+        
         </section>
       </main>
-
-      <AppTabBar />
     </>
   )
 }
@@ -288,9 +296,7 @@ function Range({ label, value, onChange, min, max, step=1 }:{
   const fmt = (n:number)=> (step < 1 ? n.toFixed(1) : Math.round(n).toString())
   return (
     <label className="flex flex-col text-sm">
-      <span className="mb-1 text-white/70">
-        {label} <span className="tabular-nums">{fmt(value)}</span>
-      </span>
+      <span className="mb-1 text-white/70">{label} <span className="tabular-nums">{fmt(value)}</span></span>
       <input type="range" min={min} max={max} step={step} value={value}
              onChange={(e)=>onChange(Number(e.target.value))}/>
     </label>
