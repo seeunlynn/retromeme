@@ -19,10 +19,12 @@ const clamp = (n:number,a:number,b:number)=>Math.max(a,Math.min(b,n))
 
 // 간단 스티커(원하는 PNG를 public/stickers 에 넣어서 경로만 추가)
 const STICKERS = [
-  '/stickers/star.png',
-  '/stickers/boom.png',
-  '/stickers/heart.png',
-  '/stickers/sparkle.png',
+  '/stickers/y2k-stars.jpeg',
+  '/stickers/blue-pin.jpeg',
+  '/stickers/exclamation.jpeg',
+  '/stickers/question-mark.jpeg',
+  '/stickers/red-pin.jpeg',
+  '/stickers/thunder.jpeg'
 ].filter(Boolean)
 
 export default function Editor() {
@@ -156,7 +158,7 @@ export default function Editor() {
                     left:`${el.x*100}%`, top:`${el.y*100}%`, lineHeight:1.1,
                     fontSize:`${px(el.fontSize)}px`, fontWeight:700, opacity: el.opacity/100,
                     color: el.color, textAlign: el.align as any,
-                    WebkitTextStrokeWidth: el.strokeWidth ? `${Math.max(1, Math.round(px(el.strokeWidth)))}px` : undefined,
+                    WebkitTextStrokeWidth: el.strokeWidth ? `${Math.max(1, px(el.strokeWidth))}px` : undefined,
                     WebkitTextStrokeColor: el.strokeWidth ? el.strokeColor : undefined,
                     // 드롭섀도우 제거(진짜 아웃라인만)
                     textShadow: 'none', userSelect:'none', WebkitUserSelect:'none'
@@ -208,15 +210,6 @@ export default function Editor() {
 
         {/* 하단 패널: 고정 높이 + 내부 스크롤 → overflow 방지 */}
         <section className="retro-card space-y-3 max-h-64 overflow-y-auto">
-          {/* 배경 선택 */}
-          <div className="grid grid-cols-2 gap-2">
-            <label className="btn-outline text-center cursor-pointer">
-              <input type="file" accept="image/*" className="hidden"
-                     onChange={e=>e.target.files && setBg(URL.createObjectURL(e.target.files[0]))}/>
-              갤러리에서 배경 선택
-            </label>
-            <a className="btn-outline text-center" href="/templates">템플릿 목록</a>
-          </div>
 
           {/* 요소 추가 */}
           <div className="grid grid-cols-2 gap-2">
@@ -244,7 +237,7 @@ export default function Editor() {
                        onChange={v=>updateSel({ fontSize:v })}/>
                 <Color label="색상" value={selected.color} onChange={v=>updateSel({ color:v })}/>
                 <Color label="외곽선색" value={selected.strokeColor} onChange={v=>updateSel({ strokeColor:v })}/>
-                <Range label="외곽선" value={selected.strokeWidth} min={0} max={20}
+                <Range label="외곽선" value={selected.strokeWidth} min={0} max={20} step = {1}
                        onChange={v=>updateSel({ strokeWidth:v })}/>
                 <Range label="불투명도" value={selected.opacity} min={10} max={100}
                        onChange={v=>updateSel({ opacity:v })}/>
@@ -288,9 +281,12 @@ export default function Editor() {
 function Range({ label, value, onChange, min, max, step=1 }:{
   label:string; value:number; onChange:(v:number)=>void; min:number; max:number; step?:number
 }) {
+  const fmt = (n:number)=> (step < 1 ? n.toFixed(1) : Math.round(n).toString())
   return (
     <label className="flex flex-col text-sm">
-      <span className="mb-1 text-white/70">{label} <span className="tabular-nums">{Math.round(value)}</span></span>
+      <span className="mb-1 text-white/70">
+        {label} <span className="tabular-nums">{fmt(value)}</span>
+      </span>
       <input type="range" min={min} max={max} step={step} value={value}
              onChange={(e)=>onChange(Number(e.target.value))}/>
     </label>
