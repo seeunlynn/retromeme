@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { --accent: #facc15; }
+body { background: #0b1220; color: #e5e7eb; }
+
+.app-safe {
+  padding-top: calc(env(safe-area-inset-top) + 56px);  /* top bar */
+  padding-bottom: calc(env(safe-area-inset-bottom) + 72px); /* tab bar */
+}
+
+.retro-card { @apply rounded-2xl p-4 border border-white/10 bg-white/5; }
+.btn { @apply rounded-xl px-4 py-2 bg-yellow-300 text-black font-bold; }
+.btn-outline { @apply rounded-xl px-3 py-2 border border-white/20 text-white/90; }
+.input { @apply w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2; }
