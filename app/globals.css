@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { --accent: #facc15; }
+:root { --accent: #6237fe; }
 body { background: #0b1220; color: #e5e7eb; }
 
 .app-safe {
