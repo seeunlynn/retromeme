@@ -1,7 +1,8 @@
 'use client'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import AppTopBar from '@/components/AppTopBar'
-import AppTabBar from '@/components/AppTabBar'
+import AppTopBar from '../../components/AppTopBar'
+import AppTabBar from '../../components/AppTabBar'
+import { useSearchParams } from 'next/navigation' 
 
 type Align = 'left'|'center'|'right'
 type TextEl = { id:string; text:string; x:number; y:number; fontSize:number; color:string; strokeColor:string; strokeWidth:number; align:Align; opacity:number }
@@ -15,10 +16,35 @@ export default function Editor() {
   const [sel, setSel] = useState<string|null>(null)
   const selected = useMemo(()=>els.find(e=>e.id===sel)??null,[els,sel])
   const [mime, setMime] = useState<'image/png'|'image/jpeg'>('image/png')
+  const searchParams = useSearchParams()
 
   const wrapRef = useRef<HTMLDivElement>(null)
   const [view, setView] = useState(0)
   useEffect(()=>{ const on=()=>setView(wrapRef.current?.clientWidth??0); on(); addEventListener('resize',on); return()=>removeEventListener('resize',on) },[])
+    // 업로드 진입 모드 처리 (sessionStorage에 담아둔 이미지 로드)
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search)
+    const mode = sp.get('mode')
+    const tpl = sp.get('tpl')
+
+    if (mode === 'upload') {
+      const data = sessionStorage.getItem('pendingUpload')
+      if (data) setBg(data)
+    } else if (mode === 'template' && tpl) {
+      setBg(`/templates/${tpl}.jpg`)
+    }
+  }, [])
+  useEffect(() => {
+  const mode = searchParams.get('mode')
+  const tpl  = searchParams.get('tpl')
+
+  if (mode === 'upload') {
+    const data = sessionStorage.getItem('pendingUpload')
+    if (data) setBg(data)
+  } else if (mode === 'template' && tpl) {
+    setBg(`/templates/${tpl}.jpg`) // 파일이 png면 확장자 맞춰주세요
+  }
+}, [searchParams])
   const dragRef = useRef<{id:string;offX:number;offY:number}|null>(null)
 
   // === drag handlers (컨트롤 클릭시 드래그 시작 금지) ===
@@ -63,7 +89,7 @@ export default function Editor() {
 
   return (
     <>
-      <AppTopBar title="Editor" onSave={onSave} onShare={onShare} />
+      <AppTopBar title="Editor" onSave={onSave} />
       <main className="app-safe mx-auto max-w-xl px-3 space-y-4">
         {/* Preview */}
         <div
