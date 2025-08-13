@@ -28,8 +28,9 @@ const STICKERS = [
 ].filter(Boolean)
 
 export default function Editor() {
-  const sp = useSearchParams()
-  const [bg, setBg] = useState('/templates/retro.jpg') // 기본값 (쿼리로 덮임)
+  const searchParams = useSearchParams()
+  const spKey = searchParams.toString() //의존성을 문자열로 고정
+  const [bg, setBg] = useState('/templates/retro.svg') // 기본값 (쿼리로 덮임)
   const [els, setEls] = useState<El[]>([])              // 텍스트/스티커 공통 배열
   const [sel, setSel] = useState<string|null>(null)
   const selected = useMemo(()=>els.find(e=>e.id===sel) ?? null,[els,sel])
@@ -46,18 +47,19 @@ export default function Editor() {
 
   // 진입 모드 반영 (템플릿/업로드)
   useEffect(()=>{
-    const mode = sp.get('mode')
-    const raw  = sp.get('tpl')
+    const mode = searchParams.get('mode')
+    const raw = searchParams.get('tpl')
     const tpl  = raw ? decodeURIComponent(raw) : null
 
     if (mode === 'upload') {
       const data = sessionStorage.getItem('pendingUpload')
-      if (data) setBg(data)
+      if (data && data !== bg) setBg(data)
     } else if (mode === 'template' && tpl) {
       const hit = templates.find(t=>t.id===tpl)
-      if (hit) setBg(hit.src)
+      if (hit && hit.src !== bg) setBg(hit.src)
     }
-  }, [sp])
+  //문자열 키를 의존성으로 사용
+  }, [spKey, bg, searchParams])
 
   // 드래그
   const dragRef = useRef<{id:string; offX:number; offY:number} | null>(null)
@@ -71,15 +73,17 @@ export default function Editor() {
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
   }
   const onMove = (e:React.PointerEvent)=>{
-    if(!dragRef.current) return
+    const cur = dragRef.current
+    if(!cur) return
     const rect = wrapRef.current!.getBoundingClientRect()
     const cx = (e.clientX-rect.left)/rect.width
     const cy = (e.clientY-rect.top)/rect.height
     // 요소가 화면에서 벗어나지 않도록 0~1로 클램프
-    setEls(p=>p.map(el=> el.id===dragRef.current!.id
-      ? { ...el, x: clamp(cx - dragRef.current!.offX, 0.02, 0.98), y: clamp(cy - dragRef.current!.offY, 0.02, 0.98) }
-      : el))
-  }
+    setEls(p=>p.filter(Boolean).map(el=> el.id===cur.id
+      ? { ...el, x: clamp(cx - cur.offX, 0.02, 0.98),
+          y: clamp(cy - cur.offY, 0.02, 0.98) }
+  : el))
+  } 
   const endDrag = (e:React.PointerEvent)=>{ dragRef.current=null; try{(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)}catch{} }
 
   // 내보내기
@@ -147,7 +151,7 @@ export default function Editor() {
           onClick={()=>setSel(null)}
         >
           <img src={bg} alt="bg" className="absolute inset-0 w-full h-full object-cover" />
-          {els.map(el=>{
+          {els.filte(Boolean).map(el=>{
             if (el.kind==='text') {
               return (
                 <div
@@ -237,7 +241,7 @@ export default function Editor() {
                        onChange={v=>updateSel({ fontSize:v })}/>
                 <Color label="색상" value={selected.color} onChange={v=>updateSel({ color:v })}/>
                 <Color label="외곽선색" value={selected.strokeColor} onChange={v=>updateSel({ strokeColor:v })}/>
-                <Range label="외곽선" value={selected.strokeWidth} min={0} max={20} step = {1}
+                <Range label="외곽선" value={selected.strokeWidth} min={0} max={20} step = {0.5}
                        onChange={v=>updateSel({ strokeWidth:v })}/>
                 <Range label="불투명도" value={selected.opacity} min={10} max={100}
                        onChange={v=>updateSel({ opacity:v })}/>
